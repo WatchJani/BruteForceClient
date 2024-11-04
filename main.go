@@ -3,11 +3,13 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -18,7 +20,6 @@ func main() {
 	}
 
 	defer conn.Close()
-
 	done := make(chan struct{})
 
 	go func() {
@@ -33,7 +34,7 @@ func main() {
 				}
 			}
 
-			fmt.Println(string(buf[:n]))
+			fmt.Println("[server]: ", string(buf[:n]))
 		}
 
 		fmt.Println("listener close")
@@ -56,8 +57,15 @@ func main() {
 					}
 
 					body := bytes.NewBufferString(text)
+					req, err := Parser(body.String())
+					if err != nil {
+						log.Println(err)
+						continue
+					}
 
-					_, err := conn.Write(body.Bytes())
+					fmt.Println(req)
+
+					_, err = conn.Write([]byte(req))
 					if err != nil {
 						log.Println(err)
 						continue
@@ -66,4 +74,48 @@ func main() {
 			}
 		}
 	}
+}
+
+//start hash [single/thread/multiple]
+
+func Parser(input string) (string, error) {
+	cmd := strings.Split(input, " ")
+
+	switch cmd[0] {
+	case "start":
+		return Start(cmd[1:])
+	case "end":
+		return End(cmd[1:])
+	default:
+		return "", fmt.Errorf("wrong command")
+	}
+}
+
+func End(args []string) (string, error) {
+	return "", nil
+}
+
+type State struct {
+	Hash string `json:"hash"` //Delete, put in Master
+	Mod  string `json:"mod"`  //Delete
+}
+
+func Start(args []string) (string, error) {
+	if len(args) != 2 {
+		return "", fmt.Errorf("wrong parameters")
+	}
+
+	fmt.Println(args)
+
+	state := State{
+		Hash: args[0],
+		Mod:  args[1],
+	}
+
+	data, err := json.Marshal(state)
+	if err != nil {
+		log.Println(err)
+	}
+
+	return fmt.Sprintf("cmd: start\nbody: %s", data), nil
 }
